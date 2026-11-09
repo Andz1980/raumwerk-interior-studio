@@ -876,11 +876,30 @@ function initialize() {
   renderProjects();
   updateBudget();
   setupEvents();
+  setupMotion();
   const profile = activeProfile();
   elements.authGate.hidden = false;
   document.querySelector(".app-shell").inert = true;
   setAuthMode(!profile ? "create" : profile.salt ? "unlock" : "setup");
   if (!navigator.xr) elements.arSupport.textContent = "WebXR ist in diesem Browser nicht verfügbar. Verwende ein AR-fähiges Smartphone mit aktuellem Chrome und HTTPS.";
+}
+
+function setupMotion() {
+  const targets = document.querySelectorAll(".workspace-section, .results-heading, .insight-card, .comparison-card, .visual-card, .floorplan-card, .projects-section");
+  if (!("IntersectionObserver" in window) || window.matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+  document.documentElement.classList.add("reveal-ready");
+  targets.forEach((element, index) => {
+    element.classList.add("reveal-on-scroll");
+    if (element.matches(".comparison-card, .visual-card")) element.style.transitionDelay = `${(index % 4) * 55}ms`;
+  });
+  const observer = new IntersectionObserver(entries => {
+    entries.forEach(entry => {
+      if (!entry.isIntersecting) return;
+      entry.target.classList.add("is-visible");
+      observer.unobserve(entry.target);
+    });
+  }, { threshold: 0.12 });
+  targets.forEach(element => observer.observe(element));
 }
 
 initialize();
