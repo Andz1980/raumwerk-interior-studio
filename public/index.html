@@ -1,0 +1,196 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#f5f2ec">
+    <meta name="description" content="Räume planen, visualisieren und als Moodboard exportieren.">
+    <title>Raumwerk — Interior Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=DM+Sans:wght@400;500;600;700&family=Manrope:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="/styles.css">
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.169.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.169.0/examples/jsm/"
+        }
+      }
+    </script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.2/dist/jspdf.umd.min.js" defer></script>
+    <script type="module" src="/app.js"></script>
+  </head>
+  <body>
+    <div class="app-shell">
+      <header class="topbar">
+        <a class="brand" href="#" aria-label="Raumwerk Startseite">
+          <span class="brand-mark" aria-hidden="true">R</span>
+          <span>raumwerk<span class="brand-dot">.</span></span>
+        </a>
+        <nav class="main-nav" aria-label="Hauptnavigation">
+          <a class="nav-link active" href="#studio">Studio</a>
+          <a class="nav-link" href="#projects">Meine Projekte</a>
+        </nav>
+        <div class="profile-control">
+          <span class="profile-avatar" id="profileAvatar">A</span>
+          <select id="profileSelect" aria-label="Profil auswählen"></select>
+          <button class="icon-button" id="addProfileButton" type="button" aria-label="Profil hinzufügen" title="Profil hinzufügen">+</button>
+        </div>
+      </header>
+
+      <main>
+        <section class="intro hero" id="studio">
+          <div class="hero-copy">
+            <p class="eyebrow"><span class="eyebrow-dot"></span> DEIN RAUM. NEU GEDACHT.</p>
+            <h1>Ein gutes Zuhause<br>beginnt mit <em>einer Idee.</em></h1>
+            <p class="hero-description">Halte deinen Raum aus vier Perspektiven fest. Entdecke Möglichkeiten, plane dein Budget und erlebe dein neues Zuhause in 3D.</p>
+            <div class="credit">Erstellt und entwickelt von Andreas Kitzel</div>
+          </div>
+          <div class="hero-art" aria-label="Illustration eines gemütlichen Wohnraums">
+            <div class="art-sun"></div><div class="art-window"><i></i><i></i><i></i><i></i></div>
+            <div class="art-plant"><b></b><b></b><b></b><i></i></div>
+            <div class="art-sofa"><i></i><b></b><em></em></div><div class="art-table"></div>
+            <span class="art-label">DEIN RÜCKZUGSORT</span>
+          </div>
+        </section>
+
+        <section class="workspace-section" aria-labelledby="captureTitle">
+          <div class="section-heading">
+            <div>
+              <p class="eyebrow">01 — RAUM ERFASSEN</p>
+              <h2 id="captureTitle">Zeig uns deinen Raum.</h2>
+            </div>
+            <span class="step-counter">4 Ansichten · 1 Raum</span>
+          </div>
+
+          <div class="capture-layout">
+            <div class="walls-grid" id="wallsGrid">
+              <article class="wall-card" data-wall="0">
+                <div class="wall-preview empty" id="wallPreview0">
+                  <span class="wall-number">01</span><span class="empty-icon" aria-hidden="true">＋</span>
+                  <span class="preview-hint">Foto hinzufügen</span>
+                </div>
+                <div class="wall-card-footer"><strong>Wand 1</strong><button class="wall-add" type="button" data-wall-action="0">Foto wählen</button></div>
+                <input class="wall-input" type="file" accept="image/*" hidden>
+              </article>
+              <article class="wall-card" data-wall="1">
+                <div class="wall-preview empty" id="wallPreview1">
+                  <span class="wall-number">02</span><span class="empty-icon" aria-hidden="true">＋</span>
+                  <span class="preview-hint">Foto hinzufügen</span>
+                </div>
+                <div class="wall-card-footer"><strong>Wand 2</strong><button class="wall-add" type="button" data-wall-action="1">Foto wählen</button></div>
+                <input class="wall-input" type="file" accept="image/*" hidden>
+              </article>
+              <article class="wall-card" data-wall="2">
+                <div class="wall-preview empty" id="wallPreview2">
+                  <span class="wall-number">03</span><span class="empty-icon" aria-hidden="true">＋</span>
+                  <span class="preview-hint">Foto hinzufügen</span>
+                </div>
+                <div class="wall-card-footer"><strong>Wand 3</strong><button class="wall-add" type="button" data-wall-action="2">Foto wählen</button></div>
+                <input class="wall-input" type="file" accept="image/*" hidden>
+              </article>
+              <article class="wall-card" data-wall="3">
+                <div class="wall-preview empty" id="wallPreview3">
+                  <span class="wall-number">04</span><span class="empty-icon" aria-hidden="true">＋</span>
+                  <span class="preview-hint">Foto hinzufügen</span>
+                </div>
+                <div class="wall-card-footer"><strong>Wand 4</strong><button class="wall-add" type="button" data-wall-action="3">Foto wählen</button></div>
+                <input class="wall-input" type="file" accept="image/*" hidden>
+              </article>
+            </div>
+            <aside class="capture-aside">
+              <div class="aside-icon" aria-hidden="true">✦</div>
+              <h3>Einmal rundherum.</h3>
+              <p>Lade pro Wand ein Foto hoch oder nimm es direkt mit deiner Kamera auf. Gute Beleuchtung hilft bei der Planung.</p>
+              <button class="button button-outline button-wide" id="cameraButton" type="button"><span aria-hidden="true">◎</span> Kamera öffnen</button>
+              <p class="privacy-note">Deine Bilder bleiben auf diesem Gerät.</p>
+            </aside>
+          </div>
+
+          <div class="camera-panel" id="cameraPanel" hidden>
+            <div class="camera-topline"><strong>Raumfoto aufnehmen</strong><button class="text-button" id="closeCameraButton" type="button">Schließen ×</button></div>
+            <video id="cameraVideo" autoplay playsinline></video>
+            <div class="camera-controls">
+              <label for="cameraWall">Ansicht</label><select id="cameraWall"><option value="0">Wand 1</option><option value="1">Wand 2</option><option value="2">Wand 3</option><option value="3">Wand 4</option></select>
+              <button class="button button-primary" id="takePhotoButton" type="button">Foto aufnehmen</button>
+            </div>
+          </div>
+
+          <div class="details-panel">
+            <div class="field-group">
+              <label for="roomName">Wie heißt dein Projekt?</label>
+              <input id="roomName" maxlength="60" placeholder="z. B. Unser Wohnzimmer" value="Mein Wohnprojekt">
+            </div>
+            <div class="field-group">
+              <label for="roomStyle">Dein Stil</label>
+              <select id="roomStyle">
+                <option value="warm">Warm & natürlich</option><option value="scandinavian">Skandinavisch</option>
+                <option value="minimal">Modern & minimal</option><option value="mediterranean">Mediterran</option>
+                <option value="industrial">Industrial</option>
+              </select>
+            </div>
+            <div class="field-group">
+              <label for="furniturePreference">Möbel-Fokus</label>
+              <select id="furniturePreference">
+                <option>Gemütliche Sitzmöbel</option><option>Stauraum & Ordnung</option>
+                <option>Natürliche Materialien</option><option>Flexible Multifunktionsmöbel</option>
+              </select>
+            </div>
+            <div class="field-group budget-field">
+              <label for="budget">Budget <strong id="budgetValue">5.000 €</strong></label>
+              <input id="budget" type="range" min="500" max="20000" step="500" value="5000">
+              <div class="range-labels"><span>500 €</span><span>20.000 €</span></div>
+            </div>
+          </div>
+          <div class="action-row">
+            <p id="analysisMessage" class="inline-message" aria-live="polite">Lade mindestens ein Wandfoto hoch, um deinen Entwurf zu starten.</p>
+            <button class="button button-primary" id="analyzeButton" type="button">Ideen entdecken <span aria-hidden="true">→</span></button>
+          </div>
+        </section>
+
+        <section class="results-section" id="results" hidden aria-labelledby="resultsTitle">
+          <div class="section-heading results-heading">
+            <div><p class="eyebrow">02 — DEIN ENTWURF</p><h2 id="resultsTitle">Neue Perspektiven für dich.</h2></div>
+            <div class="result-actions">
+              <button class="button button-outline" id="saveProjectButton" type="button">Projekt speichern</button>
+              <button class="button button-primary" id="exportPdfButton" type="button">Moodboard als PDF <span aria-hidden="true">↓</span></button>
+            </div>
+          </div>
+          <div class="insight-card"><span class="insight-spark">✦</span><div><strong id="insightTitle">Dein Raum hat Potenzial.</strong><p id="insightText"></p></div></div>
+          <div class="comparison-grid" id="comparisonGrid"></div>
+          <div class="visualization-grid">
+            <div class="visual-card">
+              <div class="visual-card-head"><div><p class="eyebrow">RAUMGEFÜHL</p><h3>3D-Begehung</h3></div><span class="live-pill">INTERAKTIV</span></div>
+              <div class="scene-wrap"><canvas id="roomCanvas" aria-label="Interaktive 3D-Ansicht des Raums"></canvas><div class="scene-loading" id="sceneLoading">3D-Ansicht wird vorbereitet …</div></div>
+              <p class="visual-hint">Ziehen zum Drehen · Scrollen zum Zoomen</p>
+            </div>
+            <div class="visual-card ar-card">
+              <div class="visual-card-head"><div><p class="eyebrow">DIREKT VOR ORT</p><h3>Im Raum erleben</h3></div><span class="ar-symbol">⌖</span></div>
+              <div class="ar-content"><div class="ar-orbit"><span>AR</span></div><p>Platziere deinen Entwurf mit einem kompatiblen Smartphone direkt in deinem Zimmer.</p>
+                <button class="button button-dark button-wide" id="arButton" type="button">AR-Modus starten <span aria-hidden="true">↗</span></button>
+                <p class="ar-support" id="arSupport">Benötigt ein AR-fähiges Smartphone und eine sichere HTTPS-Verbindung.</p>
+                <button class="text-button" id="exitArButton" type="button" hidden>AR beenden</button>
+              </div>
+            </div>
+          </div>
+          <div class="floorplan-card">
+            <div><p class="eyebrow">DEIN GRUNDRISS</p><h3>Vier Wände, viele Möglichkeiten.</h3><p>Eine schematische Raumansicht als Orientierung für dein Moodboard.</p></div>
+            <div class="floorplan" aria-label="Schematischer Grundriss"><span>Wand 1</span><span>Wand 2</span><span>Wand 3</span><span>Wand 4</span><i class="floor-sofa"></i><i class="floor-table"></i><i class="floor-plant">✳</i></div>
+          </div>
+        </section>
+
+        <section class="projects-section" id="projects">
+          <div class="section-heading">
+            <div><p class="eyebrow">DEINE IDEEN, AN EINEM ORT</p><h2>Meine Projekte<span class="brand-dot">.</span></h2></div>
+            <span class="step-counter" id="projectCount">0 Projekte</span>
+          </div>
+          <div class="project-gallery" id="projectGallery"><div class="empty-projects"><span>✦</span><strong>Noch ist hier Platz für Ideen.</strong><p>Speichere deinen ersten Entwurf, um ihn jederzeit wiederzufinden.</p></div></div>
+        </section>
+      </main>
+      <footer><span class="brand"><span class="brand-mark">R</span> raumwerk<span class="brand-dot">.</span></span><span>Deine Räume. Deine Möglichkeiten.</span></footer>
+    </div>
+    <div class="toast" id="toast" role="status" aria-live="polite"></div>
+  </body>
+</html>

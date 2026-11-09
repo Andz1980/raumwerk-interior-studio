@@ -1,0 +1,16 @@
+{
+  "name": "raumwerk-interior-studio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Browserbasierter Raumplaner mit 4-Wände-Workflow, 3D-Ansicht, AR und Moodboard-PDF",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "express": "^4.21.2"
+  }
+}
