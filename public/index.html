@@ -23,7 +23,7 @@
     <script type="module" src="/app.js"></script>
   </head>
   <body>
-    <div class="app-shell">
+    <div class="app-shell" inert>
       <header class="topbar">
         <a class="brand" href="#" aria-label="Raumwerk Startseite">
           <span class="brand-mark" aria-hidden="true">R</span>
@@ -36,6 +36,7 @@
         <div class="profile-control">
           <span class="profile-avatar" id="profileAvatar">A</span>
           <select id="profileSelect" aria-label="Profil auswählen"></select>
+          <button class="icon-button lock-button" id="lockProfileButton" type="button" aria-label="Profil sperren" title="Profil sperren">↪</button>
           <button class="icon-button" id="addProfileButton" type="button" aria-label="Profil hinzufügen" title="Profil hinzufügen">+</button>
         </div>
       </header>
@@ -190,6 +191,30 @@
         </section>
       </main>
       <footer><span class="brand"><span class="brand-mark">R</span> raumwerk<span class="brand-dot">.</span></span><span>Deine Räume. Deine Möglichkeiten.</span></footer>
+    </div>
+    <div class="auth-overlay" id="authGate" role="dialog" aria-modal="true" aria-labelledby="authTitle">
+      <form class="auth-card" id="authForm">
+        <span class="brand-mark auth-brand-mark" aria-hidden="true">R</span>
+        <p class="eyebrow">PRIVATER BEREICH</p>
+        <h2 id="authTitle">Profil entsperren</h2>
+        <p class="auth-description" id="authDescription">Melde dich mit deinem Profilpasswort an, um deine gespeicherten Projekte zu öffnen.</p>
+        <label class="auth-field" id="authProfileGroup" for="authProfileSelect">Profil
+          <select id="authProfileSelect"></select>
+        </label>
+        <label class="auth-field" id="authNameGroup" for="authName" hidden>Profilname
+          <input id="authName" type="text" maxlength="40" autocomplete="nickname" placeholder="z. B. Andreas">
+        </label>
+        <label class="auth-field" for="authPassword">Passwort
+          <input id="authPassword" type="password" minlength="12" autocomplete="current-password" required>
+        </label>
+        <label class="auth-field" id="authConfirmGroup" for="authPasswordConfirm" hidden>Passwort wiederholen
+          <input id="authPasswordConfirm" type="password" minlength="12" autocomplete="new-password">
+        </label>
+        <p class="auth-error" id="authError" role="alert" aria-live="polite"></p>
+        <button class="button button-primary auth-submit" id="authSubmit" type="submit">Profil entsperren</button>
+        <button class="text-button auth-toggle" id="authToggle" type="button">Neues Profil anlegen</button>
+        <p class="auth-note">Deine Projektdaten werden auf diesem Gerät passwortverschlüsselt gespeichert. Ein vergessenes Passwort kann nicht zurückgesetzt werden.</p>
+      </form>
     </div>
     <div class="toast" id="toast" role="status" aria-live="polite"></div>
   </body>

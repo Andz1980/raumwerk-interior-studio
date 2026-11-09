@@ -29,6 +29,21 @@ const elements = {
   profileSelect: document.querySelector("#profileSelect"),
   profileAvatar: document.querySelector("#profileAvatar"),
   addProfileButton: document.querySelector("#addProfileButton"),
+  lockProfileButton: document.querySelector("#lockProfileButton"),
+  authGate: document.querySelector("#authGate"),
+  authForm: document.querySelector("#authForm"),
+  authTitle: document.querySelector("#authTitle"),
+  authDescription: document.querySelector("#authDescription"),
+  authProfileGroup: document.querySelector("#authProfileGroup"),
+  authProfileSelect: document.querySelector("#authProfileSelect"),
+  authNameGroup: document.querySelector("#authNameGroup"),
+  authName: document.querySelector("#authName"),
+  authPassword: document.querySelector("#authPassword"),
+  authConfirmGroup: document.querySelector("#authConfirmGroup"),
+  authPasswordConfirm: document.querySelector("#authPasswordConfirm"),
+  authError: document.querySelector("#authError"),
+  authSubmit: document.querySelector("#authSubmit"),
+  authToggle: document.querySelector("#authToggle"),
   projectGallery: document.querySelector("#projectGallery"),
   projectCount: document.querySelector("#projectCount"),
   roomName: document.querySelector("#roomName"),
@@ -60,28 +75,34 @@ function createId() {
   return globalThis.crypto?.randomUUID?.() || `${Date.now()}-${Math.random().toString(16).slice(2)}`;
 }
 
-function createDefaultData() {
-  const profile = { id: createId(), name: "Mein Profil", projects: [] };
-  return { profiles: [profile], activeProfileId: profile.id };
-}
-
 function readData() {
   try {
     const saved = JSON.parse(localStorage.getItem(STORAGE_KEY));
-    if (saved && Array.isArray(saved.profiles) && saved.profiles.length) {
-      saved.profiles = saved.profiles.filter(profile => profile && typeof profile.name === "string" && Array.isArray(profile.projects));
-      if (saved.profiles.length) {
-        if (!saved.profiles.some(profile => profile.id === saved.activeProfileId)) saved.activeProfileId = saved.profiles[0].id;
-        return saved;
-      }
+    if (saved && Array.isArray(saved.profiles)) {
+      const profiles = saved.profiles
+        .filter(profile => profile && typeof profile.name === "string")
+        .map(profile => ({
+          id: profile.id || createId(),
+          name: profile.name,
+          salt: profile.salt || null,
+          iv: profile.iv || null,
+          ciphertext: profile.ciphertext || null,
+          legacyProjects: Array.isArray(profile.projects) ? profile.projects : null
+        }));
+      const activeProfileId = profiles.some(profile => profile.id === saved.activeProfileId)
+        ? saved.activeProfileId
+        : profiles[0]?.id || null;
+      return { version: 2, profiles, activeProfileId };
     }
   } catch (error) {
     console.warn("Gespeicherte Raumwerk-Daten konnten nicht gelesen werden.", error);
   }
-  return createDefaultData();
+  return { version: 2, profiles: [], activeProfileId: null };
 }
 
 let data = readData();
+const unlockedKeys = new Map();
+let authMode = "unlock";
 let walls = [null, null, null, null];
 let currentProjectId = null;
 let cameraStream = null;
@@ -89,16 +110,82 @@ let scene = null;
 let toastTimer;
 
 function activeProfile() {
-  return data.profiles.find(profile => profile.id === data.activeProfileId) || data.profiles[0];
+  return data.profiles.find(profile => profile.id === data.activeProfileId) || null;
 }
 
-function persist() {
+function encodeBase64(bytes) {
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function decodeBase64(value) {
+  return Uint8Array.from(atob(value), character => character.charCodeAt(0));
+}
+
+async function deriveProfileKey(password, salt) {
+  const material = await crypto.subtle.importKey("raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]);
+  return crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt, iterations: 310000, hash: "SHA-256" },
+    material,
+    { name: "AES-GCM", length: 256 },
+    false,
+    ["encrypt", "decrypt"]
+  );
+}
+
+async function encryptProjects(profile, key) {
+  const iv = crypto.getRandomValues(new Uint8Array(12));
+  const plaintext = new TextEncoder().encode(JSON.stringify({ projects: profile.projects || [] }));
+  const ciphertext = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, plaintext);
+  profile.iv = encodeBase64(iv);
+  profile.ciphertext = encodeBase64(new Uint8Array(ciphertext));
+}
+
+function persistMetadata() {
   try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+    const stored = {
+      version: 2,
+      activeProfileId: data.activeProfileId,
+      profiles: data.profiles.map(profile => ({
+        id: profile.id,
+        name: profile.name,
+        salt: profile.salt,
+        iv: profile.iv,
+        ciphertext: profile.ciphertext,
+        projects: profile.salt ? undefined : profile.legacyProjects
+      }))
+    };
+    localStorage.setItem(STORAGE_KEY, JSON.stringify(stored));
     return true;
   } catch (error) {
     console.error("Speichern in localStorage fehlgeschlagen.", error);
-    showToast("Der Browser-Speicher ist voll. Entferne ein älteres Projekt oder verwende kleinere Fotos.");
+    showToast("Speichern fehlgeschlagen. Entferne ein älteres Projekt oder verwende kleinere Fotos.");
+    return false;
+  }
+}
+
+async function persistProfile(profile = activeProfile()) {
+  const key = profile && unlockedKeys.get(profile.id);
+  if (!profile || !key) {
+    showToast("Das Profil ist gesperrt. Entsperre es erneut, um Änderungen zu speichern.");
+    return false;
+  }
+  const previous = { iv: profile.iv, ciphertext: profile.ciphertext };
+  try {
+    await encryptProjects(profile, key);
+    if (persistMetadata()) {
+      delete profile.legacyProjects;
+      return true;
+    }
+    profile.iv = previous.iv;
+    profile.ciphertext = previous.ciphertext;
+    return false;
+  } catch (error) {
+    profile.iv = previous.iv;
+    profile.ciphertext = previous.ciphertext;
+    console.error("Verschlüsseln des Profils fehlgeschlagen.", error);
+    showToast("Deine Änderungen konnten nicht verschlüsselt gespeichert werden.");
     return false;
   }
 }
@@ -157,18 +244,178 @@ async function setWall(index, dataUrl) {
 
 function renderProfiles() {
   elements.profileSelect.replaceChildren();
+  elements.authProfileSelect.replaceChildren();
   data.profiles.forEach(profile => {
     const option = document.createElement("option");
     option.value = profile.id;
     option.textContent = profile.name;
     option.selected = profile.id === data.activeProfileId;
+    const authOption = option.cloneNode(true);
     elements.profileSelect.append(option);
+    elements.authProfileSelect.append(authOption);
   });
-  elements.profileAvatar.textContent = (activeProfile().name.trim()[0] || "P").toLocaleUpperCase("de");
+  const profile = activeProfile();
+  if (profile) elements.profileAvatar.textContent = (profile.name.trim()[0] || "P").toLocaleUpperCase("de");
+}
+
+function setAuthMode(mode) {
+  authMode = mode;
+  const profile = data.profiles.find(item => item.id === elements.authProfileSelect.value) || activeProfile();
+  const isCreate = mode === "create";
+  const isSetup = mode === "setup";
+  elements.authProfileGroup.hidden = isCreate || data.profiles.length === 0;
+  elements.authNameGroup.hidden = !isCreate;
+  elements.authConfirmGroup.hidden = mode === "unlock";
+  elements.authPassword.value = "";
+  elements.authPasswordConfirm.value = "";
+  elements.authError.textContent = "";
+  elements.authTitle.textContent = isCreate ? "Neues Profil anlegen" : isSetup ? "Passwort festlegen" : "Profil entsperren";
+  elements.authDescription.textContent = isCreate
+    ? "Lege ein persönliches Profil und ein starkes Passwort an. Deine Projekte werden damit verschlüsselt."
+    : isSetup
+      ? "Dieses Profil enthält noch unverschlüsselte Bestandsdaten. Lege jetzt ein Passwort fest, um sie auf diesem Gerät zu verschlüsseln."
+      : `Melde dich für ${profile?.name || "dein Profil"} mit dem Profilpasswort an.`;
+  elements.authSubmit.textContent = isCreate ? "Profil erstellen" : isSetup ? "Passwort festlegen & entsperren" : "Profil entsperren";
+  elements.authToggle.hidden = data.profiles.length === 0;
+  elements.authToggle.textContent = isCreate ? "Zurück zur Anmeldung" : "Neues Profil anlegen";
+  elements.authPassword.autocomplete = mode === "unlock" ? "current-password" : "new-password";
+  if (isCreate) elements.authName.focus();
+  else elements.authPassword.focus();
+}
+
+function showAuthGate(mode) {
+  closeCamera();
+  elements.authGate.hidden = false;
+  document.querySelector(".app-shell").inert = true;
+  setAuthMode(mode);
+}
+
+function lockActiveProfile() {
+  const profile = activeProfile();
+  if (profile) {
+    unlockedKeys.delete(profile.id);
+    delete profile.projects;
+  }
+  scene?.endAR();
+  scene?.dispose();
+  scene = null;
+  walls = [null, null, null, null];
+  currentProjectId = null;
+  elements.results.hidden = true;
+  elements.comparisonGrid.replaceChildren();
+  renderProjects();
+  renderProfiles();
+  showAuthGate("unlock");
+}
+
+async function unlockProfile(profile, password) {
+  if (!crypto?.subtle) throw new Error("Dieser Browser unterstützt keine sichere Profilverschlüsselung.");
+  if (!profile.salt) {
+    const salt = crypto.getRandomValues(new Uint8Array(16));
+    const key = await deriveProfileKey(password, salt);
+    profile.projects = Array.isArray(profile.legacyProjects) ? profile.legacyProjects : [];
+    profile.salt = encodeBase64(salt);
+    await encryptProjects(profile, key);
+    if (!persistMetadata()) {
+      profile.salt = null;
+      profile.iv = null;
+      profile.ciphertext = null;
+      profile.projects = undefined;
+      throw new Error("Das Profil konnte nicht verschlüsselt gespeichert werden. Prüfe den freien Gerätespeicher.");
+    }
+    delete profile.legacyProjects;
+    unlockedKeys.set(profile.id, key);
+    return;
+  }
+
+  if (!profile.iv || !profile.ciphertext) throw new Error("Die verschlüsselten Profildaten sind unvollständig.");
+  const key = await deriveProfileKey(password, decodeBase64(profile.salt));
+  const plaintext = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: decodeBase64(profile.iv) },
+    key,
+    decodeBase64(profile.ciphertext)
+  );
+  const payload = JSON.parse(new TextDecoder().decode(plaintext));
+  if (!payload || !Array.isArray(payload.projects)) throw new Error("Die Profildaten haben ein ungültiges Format.");
+  profile.projects = payload.projects;
+  unlockedKeys.set(profile.id, key);
+}
+
+async function createProfile(name, password) {
+  if (!crypto?.subtle) throw new Error("Dieser Browser unterstützt keine sichere Profilverschlüsselung.");
+  const salt = crypto.getRandomValues(new Uint8Array(16));
+  const key = await deriveProfileKey(password, salt);
+  const profile = {
+    id: createId(),
+    name: name.trim().slice(0, 40),
+    salt: encodeBase64(salt),
+    iv: null,
+    ciphertext: null,
+    projects: []
+  };
+  data.profiles.push(profile);
+  data.activeProfileId = profile.id;
+  unlockedKeys.set(profile.id, key);
+  if (!await persistProfile(profile)) {
+    data.profiles = data.profiles.filter(item => item.id !== profile.id);
+    data.activeProfileId = data.profiles[0]?.id || null;
+    unlockedKeys.delete(profile.id);
+    throw new Error("Profil konnte nicht gespeichert werden. Prüfe den freien Gerätespeicher.");
+  }
+  finishUnlock(profile);
+  showToast(`Profil „${profile.name}“ wurde erstellt und verschlüsselt.`);
+}
+
+function finishUnlock(profile) {
+  data.activeProfileId = profile.id;
+  persistMetadata();
+  renderProfiles();
+  renderProjects();
+  document.querySelector(".app-shell").inert = false;
+  elements.authGate.hidden = true;
+}
+
+async function submitAuth(event) {
+  event.preventDefault();
+  const password = elements.authPassword.value;
+  if (password.length < 12) {
+    elements.authError.textContent = "Bitte verwende mindestens 12 Zeichen für dein Passwort.";
+    return;
+  }
+  if (authMode !== "unlock" && password !== elements.authPasswordConfirm.value) {
+    elements.authError.textContent = "Die Passwörter stimmen nicht überein.";
+    return;
+  }
+  elements.authSubmit.disabled = true;
+  elements.authError.textContent = "";
+  try {
+    if (authMode === "create") {
+      const name = elements.authName.value.trim();
+      if (!name) throw new Error("Bitte gib einen Profilnamen ein.");
+      await createProfile(name, password);
+      return;
+    }
+    const profile = data.profiles.find(item => item.id === elements.authProfileSelect.value);
+    if (!profile) throw new Error("Bitte wähle ein Profil aus.");
+    await unlockProfile(profile, password);
+    finishUnlock(profile);
+    elements.authPassword.value = "";
+    elements.authPasswordConfirm.value = "";
+  } catch (error) {
+    if (error.name === "OperationError" || error.name === "DataError") {
+      elements.authError.textContent = "Das Passwort ist falsch.";
+    } else {
+      console.error("Profil konnte nicht entsperrt werden.", error);
+      elements.authError.textContent = error.message || "Das Profil konnte nicht entsperrt werden.";
+    }
+  } finally {
+    elements.authSubmit.disabled = false;
+  }
 }
 
 function renderProjects() {
-  const projects = activeProfile().projects.slice().sort((a, b) => b.updatedAt - a.updatedAt);
+  const profile = activeProfile();
+  const projects = (profile?.projects || []).slice().sort((a, b) => b.updatedAt - a.updatedAt);
   elements.projectCount.textContent = `${projects.length} ${projects.length === 1 ? "Projekt" : "Projekte"}`;
   elements.projectGallery.replaceChildren();
   if (!projects.length) {
@@ -355,13 +602,14 @@ function snapshot() {
   };
 }
 
-function saveProject() {
+async function saveProject() {
   const project = snapshot();
-  const projects = activeProfile().projects;
+  const projects = activeProfile()?.projects;
+  if (!projects) return;
   const existingIndex = projects.findIndex(item => item.id === project.id);
   if (existingIndex >= 0) projects[existingIndex] = project;
   else projects.unshift(project);
-  if (!persist()) return;
+  if (!await persistProfile()) return;
   currentProjectId = project.id;
   renderProjects();
   showToast("Dein Projekt wurde in diesem Browser-Profil gespeichert.");
@@ -403,10 +651,15 @@ function resetWallPreview(index) {
   document.querySelector(`[data-wall-action="${index}"]`).textContent = "Foto wählen";
 }
 
-function deleteProject(projectId) {
+async function deleteProject(projectId) {
   const profile = activeProfile();
+  if (!profile?.projects) return;
+  const previousProjects = profile.projects;
   profile.projects = profile.projects.filter(project => project.id !== projectId);
-  if (!persist()) return;
+  if (!await persistProfile(profile)) {
+    profile.projects = previousProjects;
+    return;
+  }
   if (currentProjectId === projectId) currentProjectId = null;
   renderProjects();
   showToast("Projekt wurde gelöscht.");
@@ -559,27 +812,35 @@ function setupEvents() {
       }
     });
   });
-  elements.addProfileButton.addEventListener("click", () => {
-    const name = window.prompt("Wie soll dein Profil heißen?");
-    if (!name?.trim()) return;
-    const profile = { id: createId(), name: name.trim().slice(0, 40), projects: [] };
-    data.profiles.push(profile);
-    data.activeProfileId = profile.id;
-    if (!persist()) {
-      data.profiles.pop();
-      data.activeProfileId = data.profiles[0].id;
-      return;
-    }
-    renderProfiles();
-    renderProjects();
-    showToast(`Profil „${profile.name}“ wurde erstellt.`);
+  elements.addProfileButton.addEventListener("click", () => showAuthGate("create"));
+  elements.lockProfileButton.addEventListener("click", lockActiveProfile);
+  elements.authForm.addEventListener("submit", submitAuth);
+  elements.authProfileSelect.addEventListener("change", () => {
+    const profile = data.profiles.find(item => item.id === elements.authProfileSelect.value);
+    setAuthMode(profile && !profile.salt ? "setup" : "unlock");
+  });
+  elements.authToggle.addEventListener("click", () => {
+    setAuthMode(authMode === "create"
+      ? (activeProfile()?.salt ? "unlock" : "setup")
+      : "create");
   });
   elements.profileSelect.addEventListener("change", () => {
-    data.activeProfileId = elements.profileSelect.value;
-    persist();
+    const profile = data.profiles.find(item => item.id === elements.profileSelect.value);
+    if (!profile || profile.id === data.activeProfileId) return;
+    const previous = activeProfile();
+    if (previous) {
+      unlockedKeys.delete(previous.id);
+      delete previous.projects;
+    }
+    scene?.endAR();
+    scene?.dispose();
+    scene = null;
+    data.activeProfileId = profile.id;
+    persistMetadata();
     renderProfiles();
     renderProjects();
     currentProjectId = null;
+    showAuthGate(profile.salt ? "unlock" : "setup");
   });
   elements.budget.addEventListener("input", updateBudget);
   elements.analyzeButton.addEventListener("click", analyze);
@@ -615,6 +876,10 @@ function initialize() {
   renderProjects();
   updateBudget();
   setupEvents();
+  const profile = activeProfile();
+  elements.authGate.hidden = false;
+  document.querySelector(".app-shell").inert = true;
+  setAuthMode(!profile ? "create" : profile.salt ? "unlock" : "setup");
   if (!navigator.xr) elements.arSupport.textContent = "WebXR ist in diesem Browser nicht verfügbar. Verwende ein AR-fähiges Smartphone mit aktuellem Chrome und HTTPS.";
 }
 
