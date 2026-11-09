@@ -95,10 +95,8 @@ function createRoomGroup(colors, furniturePreference) {
 
   box([3.5, 2.8, 0.1], materials.wall, [0, 1.4, -1.72], 0.015);
   box([0.1, 2.8, 3.5], materials.wall, [-1.72, 1.4, 0], 0.015);
-  box([0.1, 2.8, 3.5], materials.wall, [1.72, 1.4, 0], 0.015);
   box([3.5, 0.1, 0.12], materials.trim, [0, 0.07, -1.64], 0.025);
   box([0.12, 0.1, 3.5], materials.trim, [-1.64, 0.07, 0], 0.025);
-  box([0.12, 0.1, 3.5], materials.trim, [1.64, 0.07, 0], 0.025);
 
   const boardMat = materials.floor.clone();
   boardMat.color.set(0xffffff);
